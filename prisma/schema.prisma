@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client"
+  output   = "../app/generated/prisma"
 }
 
 datasource db {
@@ -38,21 +39,24 @@ enum PaymentType {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  surname   String
-  email     String   @unique
-  role      Role     @default(PATIENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String?
+  surname      String?
+  email        String   @unique
+  passwordHash String?
+  role         Role     @default(PATIENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // NextAuth (Prisma Adapter)
-  accounts Account[]
-  sessions Session[]
-
+  accounts      Account[]
+  sessions      Session[]
+  payments      Payment[]
   subscriptions Subscription[]
-  appointments  Appointment[]  @relation("PatientAppointments")
-  doctor        DoctorProfile?
+
+  appointments       Appointment[]  @relation("PatientAppointments")
+  doctorAppointments Appointment[]  @relation("DoctorAppointments")
+  doctor             DoctorProfile?
 }
 
 model DoctorProfile {
@@ -107,6 +111,9 @@ model Subscription {
   plan Plan @relation(fields: [planId], references: [id])
 
   payments Payment[]
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Appointment {
@@ -128,8 +135,14 @@ model Appointment {
   updatedAt DateTime @updatedAt
 
   patient User @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctor  User @relation("DoctorAppointments", fields: [doctorId], references: [id])
 
   payments Payment[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([startTimeUtc])
+  @@index([status])
 }
 
 model Payment {
@@ -152,6 +165,11 @@ model Payment {
 
   subscription Subscription? @relation(fields: [subscriptionId], references: [id])
   appointment  Appointment?  @relation(fields: [appointmentId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
 }
 
 // ---------- NextAuth Prisma Adapter models ----------
