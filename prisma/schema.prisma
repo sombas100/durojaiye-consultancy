@@ -49,10 +49,11 @@ model User {
   updatedAt    DateTime @updatedAt
 
   // NextAuth (Prisma Adapter)
-  accounts      Account[]
-  sessions      Session[]
-  payments      Payment[]
-  subscriptions Subscription[]
+  accounts          Account[]
+  sessions          Session[]
+  payments          Payment[]
+  subscriptions     Subscription[]
+  availabilitySlots AvailabilitySlot[]
 
   appointments       Appointment[]  @relation("PatientAppointments")
   doctorAppointments Appointment[]  @relation("DoctorAppointments")
@@ -143,6 +144,23 @@ model Appointment {
   @@index([doctorId])
   @@index([startTimeUtc])
   @@index([status])
+}
+
+model AvailabilitySlot {
+  id String @id @default(cuid())
+
+  doctorId String
+  doctor   User   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  startTimeUtc DateTime
+  endTimeUtc   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([doctorId])
+  @@index([startTimeUtc])
+  @@index([endTimeUtc])
 }
 
 model Payment {
