@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 
 type Slot = {
   id: string;
@@ -153,8 +154,9 @@ export default function AvailabilityManager({
           <button
             disabled={loading}
             type="submit"
-            className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-1 rounded-xl bg-blue-600 text-white py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
+            <Plus className="w-5 h-5" />
             {loading ? "Creating..." : "Create slot"}
           </button>
         </form>

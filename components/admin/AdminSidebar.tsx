@@ -19,7 +19,7 @@ type AdminSidebarProps = {
 type NavItem = {
   label: string;
   href: string;
-  icon: LucideIcon; // ✅ required, never undefined
+  icon: LucideIcon;
 };
 
 const navItems: NavItem[] = [
@@ -72,7 +72,7 @@ export default function AdminSidebar({ currentPath, user }: AdminSidebarProps) {
       <div className="mt-8 border-t pt-6">
         <form action="/api/auth/signout" method="post">
           <button
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-200 transition-all ease-in"
             type="submit"
           >
             Sign out

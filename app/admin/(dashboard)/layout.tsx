@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { requireAdminOrDoctor } from "@/lib/auth-guard";
-import { BarChart3, Mail, LogIn, LogOut, Settings, Plus } from "lucide-react";
 import AdminSidebarClient from "@/components/admin/AdminSidebarClient";
 
 export default async function AdminLayout({

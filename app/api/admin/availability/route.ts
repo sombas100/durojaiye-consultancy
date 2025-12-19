@@ -72,6 +72,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const profile = await prisma.doctorProfile.findUnique({
+  where: { userId: doctorId },
+  select: { userId: true },
+});
+
+if (!profile) {
+  return NextResponse.json(
+    { error: "Doctor profile not configured. Create DoctorProfile first." },
+    { status: 400 }
+  );
+}
+
+
   // Overlap check (any slot where start < newEnd AND end > newStart)
   const overlap = await prisma.availabilitySlot.findFirst({
     where: {
