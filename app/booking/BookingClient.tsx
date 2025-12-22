@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ToastContainer, toast } from "react-toastify";
 
 type Slot = {
   id: string;
@@ -10,7 +11,9 @@ type Slot = {
   doctor?: { name: string | null; email: string | null };
 };
 
+const BASE_MINUTES = 30;
 const EXTRA_BLOCK_PRICE_KOBO = 1_000_000; // ₦10,000
+const EXTRA_10MIN_PRICE_NAIRA = 10_000;
 const TIMEZONE = "Africa/Lagos";
 
 function formatLagos(iso: string) {
@@ -28,6 +31,16 @@ function formatLagos(iso: string) {
 
 function koboToNaira(kobo: number) {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
+}
+
+function formatNaira(naira: number) {
+  return `₦${naira.toLocaleString("en-NG")}`;
+}
+
+function minutesBetween(startIso: string, endIso: string) {
+  return Math.round(
+    (new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000
+  );
 }
 
 export default function BookingClient() {
@@ -89,6 +102,8 @@ export default function BookingClient() {
     if (!res.ok) {
       setMessage(data?.error?.message || data?.error || "Booking failed.");
       return;
+    } else {
+      toast.success("Appointment confirmed!");
     }
 
     // Remove booked slot from the list
@@ -105,6 +120,7 @@ export default function BookingClient() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      {/* Left: Slots */}
       <div className="rounded-2xl bg-white p-6 shadow-sm border">
         <h2 className="text-lg font-semibold text-gray-900">Available slots</h2>
         <p className="mt-2 text-sm text-gray-600">
@@ -121,6 +137,11 @@ export default function BookingClient() {
           ) : (
             slots.map((slot) => {
               const active = slot.id === selectedSlotId;
+              const slotMins = minutesBetween(
+                slot.startTimeUtc,
+                slot.endTimeUtc
+              );
+
               return (
                 <button
                   key={slot.id}
@@ -131,11 +152,18 @@ export default function BookingClient() {
                   ].join(" ")}
                 >
                   <div className="text-sm font-medium text-gray-900">
-                    {formatLagos(slot.startTimeUtc)}
+                    {formatLagos(slot.startTimeUtc)}{" "}
+                    <span className="text-gray-500 font-normal">→</span>{" "}
+                    {formatLagos(slot.endTimeUtc)}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Doctor:{" "}
-                    {slot.doctor?.name ?? slot.doctor?.email ?? "Doctor"}
+
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                    <span>
+                      Doctor:{" "}
+                      {slot.doctor?.name ?? slot.doctor?.email ?? "Doctor"}
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <span>{slotMins} mins</span>
                   </div>
                 </button>
               );
@@ -144,17 +172,63 @@ export default function BookingClient() {
         </div>
       </div>
 
+      {/* Right: Booking */}
       <div className="rounded-2xl bg-white p-6 shadow-sm border">
         <h2 className="text-lg font-semibold text-gray-900">Your booking</h2>
 
         <div className="mt-4 space-y-4">
+          {/* Selected slot */}
           <div className="rounded-xl bg-gray-50 border p-4">
             <div className="text-sm text-gray-600">Selected slot</div>
-            <div className="mt-1 text-sm font-medium text-gray-900">
-              {selectedSlot ? formatLagos(selectedSlot.startTimeUtc) : "None"}
-            </div>
+
+            {selectedSlot ? (
+              <div className="mt-1 space-y-1">
+                <div className="text-sm font-medium text-gray-900">
+                  {formatLagos(selectedSlot.startTimeUtc)}{" "}
+                  <span className="text-gray-500 font-normal">→</span>{" "}
+                  {formatLagos(selectedSlot.endTimeUtc)}
+                </div>
+                <div className="text-xs text-gray-600">
+                  Slot duration:{" "}
+                  <span className="font-medium">
+                    {minutesBetween(
+                      selectedSlot.startTimeUtc,
+                      selectedSlot.endTimeUtc
+                    )}{" "}
+                    mins
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-1 text-sm font-medium text-gray-900">None</div>
+            )}
           </div>
 
+          {/* Base consultation info */}
+          <div className="rounded-xl border bg-blue-50 p-4">
+            <div className="text-sm font-semibold text-gray-900">
+              Consultation time
+            </div>
+            <ul className="mt-2 space-y-1 text-sm text-gray-700">
+              <li>
+                • <span className="font-medium">{BASE_MINUTES} minutes</span>{" "}
+                included (base consultation)
+              </li>
+              <li>
+                • Extra time is charged in{" "}
+                <span className="font-medium">10-minute</span> blocks:{" "}
+                <span className="font-medium">
+                  {formatNaira(EXTRA_10MIN_PRICE_NAIRA)}
+                </span>{" "}
+                per block
+              </li>
+              <li className="text-xs text-gray-600">
+                Extra time must fit within the selected availability slot.
+              </li>
+            </ul>
+          </div>
+
+          {/* Extra time selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Extra time (10-minute increments)
@@ -192,6 +266,7 @@ export default function BookingClient() {
           </button>
         </div>
       </div>
+      <ToastContainer />
     </div>
   );
 }

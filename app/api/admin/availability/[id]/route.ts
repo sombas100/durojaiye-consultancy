@@ -9,16 +9,17 @@ function assertAdminOrDoctor(role?: string) {
   return role === "ADMIN" || role === "DOCTOR";
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: Request, ctx: { params?: { id?: string } }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !assertAdminOrDoctor(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    
+    // ✅ Prefer params, fallback to URL parsing
     const url = new URL(req.url);
-    const id = url.pathname.split("/").pop();
+    const idFromUrl = url.pathname.split("/").filter(Boolean).pop();
+    const id = ctx?.params?.id || idFromUrl;
 
     if (!id) {
       return NextResponse.json({ error: "Missing slot id" }, { status: 400 });
@@ -26,11 +27,13 @@ export async function DELETE(req: Request) {
 
     await prisma.availabilitySlot.delete({ where: { id } });
 
-    return NextResponse.json({ ok: true }, { status: 204 });
+    return NextResponse.json({ ok: true });
   } catch (err: any) {
+    // ✅ If the slot was already deleted (double click or stale UI), don’t 500
     if (err?.code === "P2025") {
       return NextResponse.json({ error: "Slot not found" }, { status: 404 });
     }
+
     console.error("DELETE availability slot failed:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
