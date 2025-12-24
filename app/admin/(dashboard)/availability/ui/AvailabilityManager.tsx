@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { ToastContainer, toast } from "react-toastify";
 
 type Slot = {
   id: string;
@@ -85,12 +86,14 @@ export default function AvailabilityManager({
       },
     ]);
 
+    toast.success("Availability slot successfully created");
     setStart("");
     setEnd("");
   }
 
   async function removeSlot(id: string) {
     setError(null);
+    if (!confirm("Are you sure you want to delete this slot?")) return;
 
     const res = await fetch(`/api/admin/availability/${id}`, {
       method: "DELETE",
@@ -103,6 +106,7 @@ export default function AvailabilityManager({
       return;
     }
 
+    toast.success("Availability slot successfully deleted");
     setSlots((prev) => prev.filter((s) => s.id !== id));
   }
 
@@ -154,7 +158,7 @@ export default function AvailabilityManager({
           <button
             disabled={loading}
             type="submit"
-            className="w-full flex items-center justify-center gap-1 rounded-xl bg-blue-600 text-white py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center cursor-pointer justify-center gap-1 rounded-xl bg-blue-600 text-white py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-5 h-5" />
             {loading ? "Creating..." : "Create slot"}
@@ -179,14 +183,18 @@ export default function AvailabilityManager({
               >
                 <div className="text-sm text-gray-800">
                   <div className="font-medium">
-                    Start: {new Date(s.startTimeUtc).toUTCString()}
+                    <span className="font-semibold">Start:</span>{" "}
+                    {new Date(s.startTimeUtc).toUTCString()}
                   </div>
-                  <div>End: {new Date(s.endTimeUtc).toUTCString()}</div>
+                  <div>
+                    <span className="font-semibold">End:</span>{" "}
+                    {new Date(s.endTimeUtc).toUTCString()}
+                  </div>
                 </div>
 
                 <button
                   onClick={() => removeSlot(s.id)}
-                  className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                  className="rounded-lg cursor-pointer bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
                 >
                   Delete
                 </button>
@@ -195,6 +203,7 @@ export default function AvailabilityManager({
           )}
         </div>
       </div>
+      <ToastContainer />
     </div>
   );
 }

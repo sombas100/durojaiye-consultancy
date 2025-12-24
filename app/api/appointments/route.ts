@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { hasActiveSubscription } from "@/lib/subscription";
 
 export const runtime = "nodejs";
 
@@ -41,6 +42,11 @@ export async function POST(req: NextRequest) {
   }
 
   const patientId = session.user.id;
+  const active = await hasActiveSubscription(patientId);
+  if (!active)
+    return NextResponse.json(
+  { error: 'User must have an active subscription to book a consultation.'},
+   { status: 403 })
 
   try {
     // Fetch slot + doctor pricing config

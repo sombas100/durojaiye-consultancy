@@ -147,7 +147,7 @@ export default function BookingClient() {
                   key={slot.id}
                   onClick={() => setSelectedSlotId(slot.id)}
                   className={[
-                    "w-full text-left rounded-xl border px-4 py-3 transition",
+                    "w-full text-left cursor-pointer rounded-xl border px-4 py-3 transition",
                     active ? "border-blue-600 bg-blue-50" : "hover:bg-gray-50",
                   ].join(" ")}
                 >
@@ -260,7 +260,7 @@ export default function BookingClient() {
           <button
             disabled={loading}
             onClick={book}
-            className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl cursor-pointer bg-blue-600 text-white py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Booking…" : "Confirm booking"}
           </button>
