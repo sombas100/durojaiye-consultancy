@@ -100,11 +100,17 @@ export default function BookingClient() {
     setLoading(false);
 
     if (!res.ok) {
-      setMessage(data?.error?.message || data?.error || "Booking failed.");
+      const msg = data?.error?.message || data?.error || "Booking failed.";
+      setMessage(msg);
+      toast.error(msg);
       return;
-    } else {
-      toast.success("Appointment confirmed!");
     }
+
+    toast.success(
+      data?.appointment?.status === "PENDING_PAYMENT"
+        ? "Appointment created. Extra minutes require payment."
+        : "Appointment confirmed!"
+    );
 
     // Remove booked slot from the list
     setSlots((prev) => prev.filter((s) => s.id !== selectedSlotId));
