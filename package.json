@@ -12,6 +12,8 @@
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "@react-email/components": "^1.0.2",
+    "@react-email/render": "^2.0.0",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^0.562.0",
     "next": "16.0.10",
@@ -20,6 +22,7 @@
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "react-toastify": "^11.0.5",
+    "resend": "^6.6.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {

@@ -4,6 +4,10 @@ import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { sendDoctorBookedEmail } from "@/lib/email/send";
+import { sendPatientBookedEmail } from "@/lib/email/send";
+
+
 
 export const runtime = "nodejs";
 
@@ -148,8 +152,80 @@ export async function POST(req: NextRequest) {
 
       return appointment;
     });
+    
+      
+      (async () => {
+          try {
+              const [patient, doctor] = await Promise.all([
+              prisma.user.findUnique({
+              where: { id: patientId },
+              select: { name: true, surname: true, email: true },
+            }),
+            prisma.user.findUnique({
+              where: { id: slot.doctorId },
+              select: { name: true, email: true },
+            }),
+          ]);
+
+      const patientName =
+        `${patient?.name ?? ""} ${patient?.surname ?? ""}`.trim() ||
+        patient?.email ||
+        "Patient";
+
+    const doctorEmail = process.env.DOCTOR_NOTIFICATION_EMAIL_OVERRIDE || doctor?.email || process.env.DOCTOR_NOTIFICATION_EMAIL;
+    console.log("BOOKING EMAIL → doctorEmail:", doctorEmail);
+
+    if (!doctorEmail) {
+      console.log("BOOKING EMAIL → no doctorEmail, skipping");
+      return;
+    }
+
+      await sendDoctorBookedEmail({
+        doctorEmail,
+        doctorName: doctor?.name,
+        patientName,
+        patientEmail: patient?.email || session.user.email || "",
+        startTimeUtc: start,
+        endTimeUtc: end,
+        extraMinutes,
+        statusLabel: result.status,
+      });
+        console.log("BOOKING EMAIL → sent");
+      } catch (e) {
+        console.error("Doctor booking email failed:", e);
+      }
+        })();
+
+      (async () => {
+        try {
+          const patient = await prisma.user.findUnique({
+            where: { id: patientId },
+            select: { name: true, surname: true, email: true },
+          });
+
+      const patientEmail = patient?.email || session.user.email;
+        if (!patientEmail) return;
+
+      const patientName =
+        `${patient?.name ?? ""} ${patient?.surname ?? ""}`.trim() ||
+        patientEmail ||
+        "Patient";
+
+      await sendPatientBookedEmail({
+        patientEmail,
+        patientName,
+        startTimeUtc: start,
+        endTimeUtc: end,
+        statusLabel: result.status,
+      });
+    } catch (e) {
+      console.error("Patient booked email failed:", e);
+    }
+  })();
+
 
     return NextResponse.json({ appointment: result }, { status: 201 });
+    
   } catch (err: any) {
     if (err?.code === "SLOT_ALREADY_TAKEN") {
       return NextResponse.json(
@@ -161,4 +237,5 @@ export async function POST(req: NextRequest) {
     console.error("Create appointment failed:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
+  
 }

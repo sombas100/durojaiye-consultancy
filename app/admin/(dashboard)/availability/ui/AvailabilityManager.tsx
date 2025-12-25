@@ -11,6 +11,90 @@ type Slot = {
   endTimeUtc: string | Date;
 };
 
+const LAGOS_TZ = "Africa/Lagos";
+
+function formatLagos(iso: string | Date) {
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: LAGOS_TZ,
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
+// Returns "YYYY-MM-DDTHH:mm" formatted in Africa/Lagos (for datetime-local inputs)
+function formatDatetimeLocalInLagos(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: LAGOS_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .formatToParts(date)
+    .reduce<Record<string, string>>((acc, p) => {
+      if (p.type !== "literal") acc[p.type] = p.value;
+      return acc;
+    }, {});
+
+  const yyyy = parts.year;
+  const mm = parts.month;
+  const dd = parts.day;
+  const hh = parts.hour;
+  const min = parts.minute;
+
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+/**
+ * Convert Lagos "YYYY-MM-DDTHH:mm" to a UTC Date, regardless of the user's device timezone.
+ * (Nigeria doesn't do DST; still computed safely.)
+ */
+function lagosDatetimeLocalToUtcDate(value: string) {
+  const [datePart, timePart] = value.split("T");
+  const [y, m, d] = datePart.split("-").map(Number);
+  const [hh, mm] = timePart.split(":").map(Number);
+
+  // Build a "fake UTC" date with these wall-clock components
+  const fakeUtc = new Date(Date.UTC(y, m - 1, d, hh, mm, 0, 0));
+
+  // Determine Lagos offset at that instant by comparing Lagos vs UTC formatted minutes
+  const toMinutes = (parts: Intl.DateTimeFormatPart[]) => {
+    const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+    const m2 = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+    return h * 60 + m2;
+  };
+
+  const utcParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(fakeUtc);
+
+  const lagosParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: LAGOS_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(fakeUtc);
+
+  let offsetMinutes = toMinutes(lagosParts) - toMinutes(utcParts);
+
+  // handle wrap-around across midnight
+  if (offsetMinutes > 720) offsetMinutes -= 1440;
+  if (offsetMinutes < -720) offsetMinutes += 1440;
+
+  // UTC = Lagos - offset
+  return new Date(fakeUtc.getTime() - offsetMinutes * 60_000);
+}
+
 export default function AvailabilityManager({
   doctor,
   initialSlots,
@@ -33,6 +117,16 @@ export default function AvailabilityManager({
 
   const doctorId = doctor?.id ?? "";
 
+  const minStart = useMemo(() => {
+    // 1 minute grace
+    return formatDatetimeLocalInLagos(new Date(Date.now() - 60_000));
+  }, []);
+
+  const minEnd = useMemo(() => {
+    if (!start) return minStart;
+    return start; // end cannot be before start
+  }, [start, minStart]);
+
   const sortedSlots = useMemo(
     () =>
       [...slots].sort(
@@ -52,10 +146,25 @@ export default function AvailabilityManager({
       return;
     }
 
-    // datetime-local returns local time. We convert to ISO; browser will convert based on local TZ.
-    // Later we can force Africa/Lagos display explicitly, but this is okay for now.
-    const startIso = new Date(start).toISOString();
-    const endIso = new Date(end).toISOString();
+    if (!start || !end) {
+      setError("Please choose a start and end time.");
+      return;
+    }
+
+    // Convert input (Lagos wall clock) -> UTC
+    const startUtc = lagosDatetimeLocalToUtcDate(start);
+    const endUtc = lagosDatetimeLocalToUtcDate(end);
+
+    // Client-side checks (API will also enforce)
+    const nowMinus1Min = new Date(Date.now() - 60_000);
+    if (startUtc < nowMinus1Min) {
+      setError("You cannot create availability in the past.");
+      return;
+    }
+    if (endUtc <= startUtc) {
+      setError("End time must be after start time.");
+      return;
+    }
 
     setLoading(true);
     const res = await fetch("/api/admin/availability", {
@@ -63,16 +172,19 @@ export default function AvailabilityManager({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         doctorId,
-        startTimeUtc: startIso,
-        endTimeUtc: endIso,
+        startTimeUtc: startUtc.toISOString(),
+        endTimeUtc: endUtc.toISOString(),
       }),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
     setLoading(false);
 
     if (!res.ok) {
-      setError(data?.error?.message || data?.error || "Failed to create slot.");
+      const msg =
+        data?.error?.message || data?.error || "Failed to create slot.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -101,8 +213,10 @@ export default function AvailabilityManager({
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
+      const msg = data?.error || "Failed to delete slot.";
       console.log("Delete failed:", res.status, data);
-      setError(data?.error || "Failed to delete slot.");
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -122,15 +236,26 @@ export default function AvailabilityManager({
           </span>
         </div>
 
+        <p className="mt-2 text-xs text-gray-500">
+          Times are entered in{" "}
+          <span className="font-medium">Africa/Lagos (WAT)</span> and stored in
+          UTC.
+        </p>
+
         <form onSubmit={createSlot} className="mt-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start (local)
+              Start (Africa/Lagos)
             </label>
             <input
               type="datetime-local"
               value={start}
-              onChange={(e) => setStart(e.target.value)}
+              min={minStart}
+              onChange={(e) => {
+                setStart(e.target.value);
+                // if end is before new start, reset end to avoid confusion
+                if (end && e.target.value && end < e.target.value) setEnd("");
+              }}
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
               required
             />
@@ -138,11 +263,12 @@ export default function AvailabilityManager({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              End (local)
+              End (Africa/Lagos)
             </label>
             <input
               type="datetime-local"
               value={end}
+              min={minEnd}
               onChange={(e) => setEnd(e.target.value)}
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
               required
@@ -169,7 +295,7 @@ export default function AvailabilityManager({
       <div className="rounded-2xl bg-white p-6 shadow-sm border">
         <h2 className="text-lg font-semibold text-gray-900">Existing slots</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Stored in UTC. (We’ll display Africa/Lagos nicely next.)
+          Times shown in Africa/Lagos (WAT).
         </p>
 
         <div className="mt-5 space-y-3">
@@ -184,11 +310,11 @@ export default function AvailabilityManager({
                 <div className="text-sm text-gray-800">
                   <div className="font-medium">
                     <span className="font-semibold">Start:</span>{" "}
-                    {new Date(s.startTimeUtc).toUTCString()}
+                    {formatLagos(s.startTimeUtc)}
                   </div>
                   <div>
                     <span className="font-semibold">End:</span>{" "}
-                    {new Date(s.endTimeUtc).toUTCString()}
+                    {formatLagos(s.endTimeUtc)}
                   </div>
                 </div>
 
@@ -203,6 +329,7 @@ export default function AvailabilityManager({
           )}
         </div>
       </div>
+
       <ToastContainer />
     </div>
   );

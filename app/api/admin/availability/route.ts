@@ -72,18 +72,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // ✅ NEW: block past slots (with small grace to avoid edge cases)
+  const nowMinus1Min = new Date(Date.now() - 60_000);
+  if (start < nowMinus1Min) {
+    return NextResponse.json(
+      { error: "You cannot create availability in the past." },
+      { status: 400 }
+    );
+  }
+
   const profile = await prisma.doctorProfile.findUnique({
-  where: { userId: doctorId },
-  select: { userId: true },
-});
+    where: { userId: doctorId },
+    select: { userId: true },
+  });
 
-if (!profile) {
-  return NextResponse.json(
-    { error: "Doctor profile not configured. Create DoctorProfile first." },
-    { status: 400 }
-  );
-}
-
+  if (!profile) {
+    return NextResponse.json(
+      { error: "Doctor profile not configured. Create DoctorProfile first." },
+      { status: 400 }
+    );
+  }
 
   // Overlap check (any slot where start < newEnd AND end > newStart)
   const overlap = await prisma.availabilitySlot.findFirst({
@@ -113,3 +121,4 @@ if (!profile) {
 
   return NextResponse.json({ slot }, { status: 201 });
 }
+

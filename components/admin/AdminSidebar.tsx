@@ -39,7 +39,7 @@ function isActive(currentPath: string, href: string) {
 
 export default function AdminSidebar({ currentPath, user }: AdminSidebarProps) {
   return (
-    <aside className="w-72 shrink-0 border-r bg-gray-900 text-gray-400 min-h-screen px-4 py-6">
+    <aside className="w-72 shrink-0 border-r bg-gray-900 text-gray-400 min-h-screen h-full px-4 py-6">
       <div className="mb-8">
         <div className="flex gap-2 text-lg text-white font-semibold ">
           <BarChart3 className="text-gray-200" /> Admin Dashboard
@@ -62,7 +62,7 @@ export default function AdminSidebar({ currentPath, user }: AdminSidebarProps) {
                 active ? "bg-sky-500 text-white transition ease-out" : "",
               ].join(" ")}
             >
-              <IconComponent />
+              <IconComponent className="" />
               {item.label}
             </Link>
           );

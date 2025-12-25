@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { sendDoctorCancelledByPatientEmail } from "@/lib/email/send";
+import { sendPatientCancelledBySelfEmail } from "@/lib/email/send";
+
+
 
 export const runtime = "nodejs";
 
@@ -91,8 +95,74 @@ export async function PATCH(req: Request) {
         reopened = true;
       }
 
+      // fire-and-forget email to patient (confirmation)
+    (async () => {
+      try {
+        const patient = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true, surname: true, email: true },
+      });
+
+        const patientEmail = patient?.email || session.user.email;
+        if (!patientEmail) return;
+
+      const patientName =
+        `${patient?.name ?? ""} ${patient?.surname ?? ""}`.trim() ||
+        patientEmail ||
+        "Patient";
+
+      await sendPatientCancelledBySelfEmail({
+        patientEmail,
+        patientName,
+        startTimeUtc: start,
+        endTimeUtc: end,
+        reopenedSlot: result.reopened,
+      });
+      } catch (e) {
+        console.error("Patient cancel confirmation email failed:", e);
+      }
+    })();
+
+
       return { updated, reopened };
     });
+
+    
+    (async () => {
+      try {
+        const [patient, doctor] = await Promise.all([
+          prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { name: true, surname: true, email: true },
+          }),
+          prisma.user.findUnique({
+            where: { id: appt.doctorId },
+            select: { name: true, email: true },
+          }),
+        ]);
+
+        const patientName =
+          `${patient?.name ?? ""} ${patient?.surname ?? ""}`.trim() ||
+          patient?.email ||
+          "Patient";
+
+        const doctorEmail = doctor?.email || process.env.DOCTOR_NOTIFICATION_EMAIL;
+        if (!doctorEmail) return;
+
+      await sendDoctorCancelledByPatientEmail({
+          doctorEmail,
+          doctorName: doctor?.name,
+          patientName,
+          patientEmail: patient?.email || session.user.email || "",
+          startTimeUtc: start,
+          endTimeUtc: end,
+          reopenedSlot: result.reopened,
+      });
+  } catch (e) {
+    console.error("Doctor cancel email failed:", e);
+  }
+})();
+
 
     return NextResponse.json({
       appointment: result.updated,
