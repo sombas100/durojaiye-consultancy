@@ -1,6 +1,7 @@
 import Navbar from "./Navbar";
 import Hero from "@/components/ui/Hero";
 import Link from "next/link";
+import Footer from "./Footer";
 
 export default function Home() {
   return (
@@ -137,6 +138,7 @@ export default function Home() {
           </div>
         </section>
       </main>
+      <Footer />
     </>
   );
 }

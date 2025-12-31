@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ToastContainer, toast } from "react-toastify";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Slot = {
   id: string;
@@ -50,6 +51,8 @@ export default function BookingClient() {
   const [loading, setLoading] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
+  const params = useSearchParams();
 
   useEffect(() => {
     (async () => {
@@ -71,6 +74,15 @@ export default function BookingClient() {
         }))
       );
     })();
+  }, []);
+
+  useEffect(() => {
+    const subscribed = params.get("subscribed");
+    if (subscribed === "1") {
+      toast.success("Subscription activated. You can now book appointments.");
+
+      router.replace("/booking");
+    }
   }, []);
 
   const selectedSlot = useMemo(
