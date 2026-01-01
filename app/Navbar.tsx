@@ -75,19 +75,33 @@ export default function Navbar() {
               );
             })}
 
-            {/* Patient-only link */}
+            {/* Patient-only links */}
             {isAuthenticated && isPatient && (
-              <Link
-                href="/my-appointments"
-                className={[
-                  "rounded-xl px-3 py-2 text-sm font-medium transition",
-                  isActive("/my-appointments")
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
-                ].join(" ")}
-              >
-                My Appointments
-              </Link>
+              <>
+                <Link
+                  href="/my-appointments"
+                  className={[
+                    "rounded-xl px-3 py-2 text-sm font-medium transition",
+                    isActive("/my-appointments")
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
+                  ].join(" ")}
+                >
+                  My Appointments
+                </Link>
+
+                <Link
+                  href="/billing"
+                  className={[
+                    "rounded-xl px-3 py-2 text-sm font-medium transition",
+                    isActive("/billing")
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
+                  ].join(" ")}
+                >
+                  Billing
+                </Link>
+              </>
             )}
           </nav>
 
@@ -117,8 +131,9 @@ export default function Navbar() {
             >
               Book now
             </Link>
-            <p className="text-xs font-medium tracking-wider">
-              {session?.user && `Welcome back, ${session.user.name}`}
+
+            <p className="text-xs font-medium tracking-wider text-gray-700">
+              {session?.user?.name ? `Welcome back, ${session.user.name}` : ""}
             </p>
           </div>
 
@@ -157,13 +172,33 @@ export default function Navbar() {
               })}
 
               {isAuthenticated && isPatient && (
-                <Link
-                  href="/my-appointments"
-                  onClick={() => setOpen(false)}
-                  className="rounded-xl px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  My Appointments
-                </Link>
+                <>
+                  <Link
+                    href="/my-appointments"
+                    onClick={() => setOpen(false)}
+                    className={[
+                      "rounded-xl px-3 py-2 text-sm font-medium transition",
+                      isActive("/my-appointments")
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
+                    ].join(" ")}
+                  >
+                    My Appointments
+                  </Link>
+
+                  <Link
+                    href="/billing"
+                    onClick={() => setOpen(false)}
+                    className={[
+                      "rounded-xl px-3 py-2 text-sm font-medium transition",
+                      isActive("/billing")
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
+                    ].join(" ")}
+                  >
+                    Billing
+                  </Link>
+                </>
               )}
 
               <div className="my-2 h-px bg-gray-200" />

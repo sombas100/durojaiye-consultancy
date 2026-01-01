@@ -98,8 +98,9 @@ model Subscription {
   planId String
   status SubscriptionStatus @default(PENDING)
 
-  startDate DateTime?
-  endDate   DateTime?
+  startDate         DateTime?
+  endDate           DateTime?
+  cancelAtPeriodEnd Boolean   @default(false)
 
   // Paystack identifiers
   paystackSubscriptionCode String? @unique
