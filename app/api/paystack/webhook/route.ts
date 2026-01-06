@@ -84,10 +84,6 @@ type PaystackSubListItem = {
 
 async function fetchLatestSubscriptionByEmail(email: string) {
   const secretKey = assertEnv("PAYSTACK_SECRET_KEY");
-
-  // If your Paystack supports filtering:
-  // const url = `https://api.paystack.co/subscription?customer=${encodeURIComponent(email)}&perPage=50&page=1`;
-  // Some accounts behave better with unfiltered list + local filter:
   const url = `https://api.paystack.co/subscription?perPage=50&page=1`;
 
   const res = await fetch(url, {
@@ -137,7 +133,7 @@ export async function POST(req: NextRequest) {
   const event = JSON.parse(rawBody);
   const eventName: string | undefined = event?.event;
 
-  // ✅ Handle cancellation event from Paystack too
+  // Handle cancellation event from Paystack too
   if (eventName === "subscription.disable") {
     const subCode: string | undefined = event?.data?.subscription_code;
 
@@ -154,7 +150,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
-  // We care most about charge.success for activation
+  // We care most about charge.success for payments
   if (eventName !== "charge.success") {
     return NextResponse.json({ received: true }, { status: 200 });
   }
@@ -162,11 +158,95 @@ export async function POST(req: NextRequest) {
   const data = event.data;
   const reference: string | undefined = data?.reference;
 
-  // metadata we sent from /subscribe
   const metadata = data?.metadata || {};
-  const type = metadata?.type;
+  const type: string | undefined = metadata?.type;
 
-  if (!reference || type !== "SUBSCRIPTION") {
+  if (!reference || !type) {
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  /**
+   * =========================================================
+   *  1) ONE-OFF EXTRA MINUTES PAYMENT
+   * =========================================================
+   */
+  if (type === "EXTRA_MINUTES") {
+    const paymentId: string | undefined = metadata?.paymentId;
+    const appointmentId: string | undefined = metadata?.appointmentId;
+
+    // We always create a Payment row BEFORE Paystack initialize,
+    // so if these are missing, don't guess. Just acknowledge.
+    if (!paymentId || !appointmentId) {
+      return NextResponse.json({ received: true }, { status: 200 });
+    }
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        // ✅ Validate the payment row matches this appointment + type
+        const pay = await tx.payment.findUnique({
+          where: { id: paymentId },
+          select: {
+            id: true,
+            status: true,
+            type: true,
+            appointmentId: true,
+            amountKobo: true,
+          },
+        });
+
+        if (!pay) return;
+        if (pay.type !== "EXTRA_MINUTES") return;
+        if (pay.appointmentId !== appointmentId) return;
+
+        // ✅ Ensure Paystack amount matches what we expected to charge
+        if (typeof data?.amount === "number" && data.amount !== pay.amountKobo) {
+          throw new Error("Amount mismatch for EXTRA_MINUTES payment");
+        }
+
+        // ✅ Idempotent: if already SUCCESS, just ensure reference is stored
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: {
+            status: "SUCCESS",
+            reference,
+          },
+        });
+
+        // ✅ Confirm appointment (only if not cancelled/completed)
+        const appt = await tx.appointment.findUnique({
+          where: { id: appointmentId },
+          select: { id: true, status: true },
+        });
+
+        if (!appt) return;
+
+        if (appt.status !== "CANCELLED" && appt.status !== "COMPLETED") {
+          await tx.appointment.update({
+            where: { id: appointmentId },
+            data: { status: "CONFIRMED" },
+          });
+        }
+      });
+
+      return NextResponse.json({ ok: true }, { status: 200 });
+    } catch (e: any) {
+      // If webhook retries and reference already exists, treat as success (idempotent).
+      if (e?.code === "P2002") {
+        return NextResponse.json({ ok: true }, { status: 200 });
+      }
+
+      console.error("Webhook EXTRA_MINUTES handling failed:", e);
+      return NextResponse.json({ ok: false }, { status: 500 });
+    }
+  }
+
+  /**
+   * =========================================================
+   *  2) SUBSCRIPTION PAYMENT 
+   * =========================================================
+   */
+  if (type !== "SUBSCRIPTION") {
+    // Unknown type, ignore safely
     return NextResponse.json({ received: true }, { status: 200 });
   }
 
@@ -185,7 +265,7 @@ export async function POST(req: NextRequest) {
   let emailToken: string | null =
     (data?.subscription?.email_token as string | undefined) ?? null;
 
-  // Fallback to verify if missing (common in test mode)
+  // Fallback to verify if missing
   if (!subscriptionCode || !emailToken) {
     try {
       const verified = await fetchSubscriptionFromVerify(reference);
@@ -196,7 +276,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Fallback to subscription list by email if still missing
+  // Fallback to subscription list by email
   if (!subscriptionCode || !emailToken) {
     const customerEmail: string | undefined =
       (data?.customer?.email as string | undefined) ??
@@ -219,12 +299,12 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction(async (tx) => {
       // 1) Mark payment success + store reference
       if (paymentId) {
+        // NOTE: this update() will throw if already SUCCESS; keep your pattern or switch to updateMany.
         await tx.payment.update({
           where: { id: paymentId },
           data: { status: "SUCCESS", reference },
         });
       } else {
-        // fallback: upsert by reference if you ever need it
         await tx.payment.upsert({
           where: { reference },
           create: {
@@ -247,7 +327,7 @@ export async function POST(req: NextRequest) {
         data: { status: "CANCELLED" },
       });
 
-      // 3) Fetch current subscription dates (so we extend correctly)
+      // 3) Fetch current subscription dates
       const sub = await tx.subscription.findUnique({
         where: { id: subscriptionId },
         select: { id: true, startDate: true, endDate: true, cancelAtPeriodEnd: true },
@@ -255,7 +335,6 @@ export async function POST(req: NextRequest) {
 
       if (!sub) return;
 
-      // Extend from endDate if still in future, otherwise extend from now
       const base = sub.endDate && sub.endDate > now ? sub.endDate : now;
       const nextEnd = addOneMonth(base);
 
@@ -265,7 +344,6 @@ export async function POST(req: NextRequest) {
           status: "ACTIVE",
           startDate: sub.startDate ?? now,
           endDate: nextEnd,
-          // ✅ Preserve cancelAtPeriodEnd if they already scheduled cancellation
           cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
           ...(subscriptionCode ? { paystackSubscriptionCode: subscriptionCode } : {}),
           ...(emailToken ? { paystackEmailToken: emailToken } : {}),
@@ -282,7 +360,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (e) {
-    console.error("Webhook handling failed:", e);
+    console.error("Webhook SUBSCRIPTION handling failed:", e);
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

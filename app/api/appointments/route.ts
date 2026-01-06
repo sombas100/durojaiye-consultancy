@@ -7,8 +7,6 @@ import { hasActiveSubscription } from "@/lib/subscription";
 import { sendDoctorBookedEmail } from "@/lib/email/send";
 import { sendPatientBookedEmail } from "@/lib/email/send";
 
-
-
 export const runtime = "nodejs";
 
 const schema = z.object({
@@ -46,11 +44,14 @@ export async function POST(req: NextRequest) {
   }
 
   const patientId = session.user.id;
+
   const active = await hasActiveSubscription(patientId);
-  if (!active)
+  if (!active) {
     return NextResponse.json(
-  { error: 'User must have an active subscription to book a consultation.'},
-   { status: 403 })
+      { error: "User must have an active subscription to book a consultation." },
+      { status: 403 }
+    );
+  }
 
   try {
     // Fetch slot + doctor pricing config
@@ -78,19 +79,18 @@ export async function POST(req: NextRequest) {
     });
 
     if (!doctorProfile) {
-      return NextResponse.json(
-        { error: "Doctor profile not configured." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Doctor profile not configured." }, { status: 500 });
     }
 
     const baseDurationMinutes = doctorProfile.baseDurationMinutes; // e.g. 30
     const extraBlocks = extraMinutes / 10;
 
-    // Base is free with subscription (your choice), so basePriceKobo likely 0.
-    // Total here is only extras.
-    const totalPriceKobo =
-      (doctorProfile.basePriceKobo ?? 0) + extraBlocks * doctorProfile.extra10MinPriceKobo;
+    // ✅ extra-only amount (this is what Paystack extra-time route should charge)
+    const extraPriceKobo = extraBlocks * doctorProfile.extra10MinPriceKobo;
+
+    // ✅ total can include base + extra (if base is paid separately, set basePriceKobo to 0)
+    const basePriceKobo = doctorProfile.basePriceKobo ?? 0;
+    const totalPriceKobo = basePriceKobo + extraPriceKobo;
 
     const start = new Date(slot.startTimeUtc);
     const end = new Date(start.getTime() + (baseDurationMinutes + extraMinutes) * 60_000);
@@ -115,10 +115,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (overlap) {
-      return NextResponse.json(
-        { error: "This time is already booked." },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "This time is already booked." }, { status: 409 });
     }
 
     // Reserve atomically: create appointment + delete slot so others can’t book it
@@ -142,90 +139,101 @@ export async function POST(req: NextRequest) {
           baseDurationMinutes,
           extraMinutes,
           extraBlocks,
+          extraPriceKobo, // ✅ NEW FIELD
           totalPriceKobo,
-          status: totalPriceKobo > 0 ? "PENDING_PAYMENT" : "CONFIRMED",
+          // ✅ booking requires active subscription, so payment gating should be for extras only
+          status: extraPriceKobo > 0 ? "PENDING_PAYMENT" : "CONFIRMED",
         },
-        select: { id: true, status: true, totalPriceKobo: true },
+        select: {
+          id: true,
+          status: true,
+          totalPriceKobo: true,
+          extraPriceKobo: true,
+        },
       });
 
       await tx.availabilitySlot.delete({ where: { id: slotId } });
 
       return appointment;
     });
-    
-      
-      (async () => {
-          try {
-              const [patient, doctor] = await Promise.all([
-              prisma.user.findUnique({
-              where: { id: patientId },
-              select: { name: true, surname: true, email: true },
-            }),
-            prisma.user.findUnique({
-              where: { id: slot.doctorId },
-              select: { name: true, email: true },
-            }),
-          ]);
 
-      const patientName =
-        `${patient?.name ?? ""} ${patient?.surname ?? ""}`.trim() ||
-        patient?.email ||
-        "Patient";
+    // Fire-and-forget doctor email
+    (async () => {
+      try {
+        const [patient, doctor] = await Promise.all([
+          prisma.user.findUnique({
+            where: { id: patientId },
+            select: { name: true, surname: true, email: true },
+          }),
+          prisma.user.findUnique({
+            where: { id: slot.doctorId },
+            select: { name: true, email: true },
+          }),
+        ]);
 
-    const doctorEmail = process.env.DOCTOR_NOTIFICATION_EMAIL_OVERRIDE || doctor?.email || process.env.DOCTOR_NOTIFICATION_EMAIL;
-    console.log("BOOKING EMAIL → doctorEmail:", doctorEmail);
+        const patientName =
+          `${patient?.name ?? ""} ${patient?.surname ?? ""}`.trim() ||
+          patient?.email ||
+          "Patient";
 
-    if (!doctorEmail) {
-      console.log("BOOKING EMAIL → no doctorEmail, skipping");
-      return;
-    }
+        const doctorEmail =
+          process.env.DOCTOR_NOTIFICATION_EMAIL_OVERRIDE ||
+          doctor?.email ||
+          process.env.DOCTOR_NOTIFICATION_EMAIL;
 
-      await sendDoctorBookedEmail({
-        doctorEmail,
-        doctorName: doctor?.name,
-        patientName,
-        patientEmail: patient?.email || session.user.email || "",
-        startTimeUtc: start,
-        endTimeUtc: end,
-        extraMinutes,
-        statusLabel: result.status,
-      });
+        console.log("BOOKING EMAIL → doctorEmail:", doctorEmail);
+
+        if (!doctorEmail) {
+          console.log("BOOKING EMAIL → no doctorEmail, skipping");
+          return;
+        }
+
+        await sendDoctorBookedEmail({
+          doctorEmail,
+          doctorName: doctor?.name,
+          patientName,
+          patientEmail: patient?.email || session.user.email || "",
+          startTimeUtc: start,
+          endTimeUtc: end,
+          extraMinutes,
+          statusLabel: result.status,
+        });
+
         console.log("BOOKING EMAIL → sent");
       } catch (e) {
         console.error("Doctor booking email failed:", e);
       }
-        })();
+    })();
 
-      (async () => {
-        try {
-          const patient = await prisma.user.findUnique({
-            where: { id: patientId },
-            select: { name: true, surname: true, email: true },
-          });
+    // Fire-and-forget patient email
+    (async () => {
+      try {
+        const patient = await prisma.user.findUnique({
+          where: { id: patientId },
+          select: { name: true, surname: true, email: true },
+        });
 
-      const patientEmail = patient?.email || session.user.email;
+        const patientEmail = patient?.email || session.user.email;
         if (!patientEmail) return;
 
-      const patientName =
-        `${patient?.name ?? ""} ${patient?.surname ?? ""}`.trim() ||
-        patientEmail ||
-        "Patient";
+        const patientName =
+          `${patient?.name ?? ""} ${patient?.surname ?? ""}`.trim() ||
+          patientEmail ||
+          "Patient";
 
-      await sendPatientBookedEmail({
-        patientEmail,
-        patientName,
-        startTimeUtc: start,
-        endTimeUtc: end,
-        statusLabel: result.status,
-      });
-    } catch (e) {
-      console.error("Patient booked email failed:", e);
-    }
-  })();
-
+        await sendPatientBookedEmail({
+          patientEmail,
+          patientName,
+          startTimeUtc: start,
+          endTimeUtc: end,
+          statusLabel: result.status,
+        });
+      } catch (e) {
+        console.error("Patient booked email failed:", e);
+      }
+    })();
 
     return NextResponse.json({ appointment: result }, { status: 201 });
-    
   } catch (err: any) {
     if (err?.code === "SLOT_ALREADY_TAKEN") {
       return NextResponse.json(
@@ -237,5 +245,4 @@ export async function POST(req: NextRequest) {
     console.error("Create appointment failed:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-  
 }

@@ -80,10 +80,9 @@ export default function BookingClient() {
     const subscribed = params.get("subscribed");
     if (subscribed === "1") {
       toast.success("Subscription activated. You can now book appointments.");
-
       router.replace("/booking");
     }
-  }, []);
+  }, [params, router]);
 
   const selectedSlot = useMemo(
     () => slots.find((s) => s.id === selectedSlotId) ?? null,
@@ -102,38 +101,69 @@ export default function BookingClient() {
     }
 
     setLoading(true);
-    const res = await fetch("/api/appointments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slotId: selectedSlotId, extraMinutes }),
-    });
+    try {
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slotId: selectedSlotId, extraMinutes }),
+      });
 
-    const data = await res.json().catch(() => null);
-    setLoading(false);
+      const data = await res.json().catch(() => null);
 
-    if (!res.ok) {
-      const msg = data?.error?.message || data?.error || "Booking failed.";
+      if (!res.ok) {
+        const msg = data?.error?.message || data?.error || "Booking failed.";
+        setMessage(msg);
+        toast.error(msg);
+        return;
+      }
+
+      const appointment = data?.appointment;
+
+      toast.success(
+        appointment?.status === "PENDING_PAYMENT"
+          ? "Appointment created. Redirecting to Paystack for extra minutes…"
+          : "Appointment confirmed!"
+      );
+
+      // Remove booked slot from the list
+      setSlots((prev) => prev.filter((s) => s.id !== selectedSlotId));
+      setSelectedSlotId("");
+      setExtraMinutes(0);
+
+      if (appointment?.status === "PENDING_PAYMENT") {
+        setMessage("Redirecting to Paystack to pay for extra minutes…");
+
+        const payRes = await fetch("/api/billing/extra-time", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appointmentId: appointment.id }),
+        });
+
+        const payData = await payRes.json().catch(() => null);
+
+        if (!payRes.ok) {
+          const msg =
+            payData?.error ||
+            "Unable to start extra-minutes payment. Please try again.";
+          setMessage(msg);
+          toast.error(msg);
+          return;
+        }
+
+        // ✅ Send to Paystack checkout
+        window.location.href = payData.authorizationUrl;
+        return;
+      }
+
+      setMessage("Appointment confirmed!");
+    } catch (e) {
+      console.error(e);
+      const msg = "Something went wrong. Please try again.";
       setMessage(msg);
       toast.error(msg);
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    toast.success(
-      data?.appointment?.status === "PENDING_PAYMENT"
-        ? "Appointment created. Extra minutes require payment."
-        : "Appointment confirmed!"
-    );
-
-    // Remove booked slot from the list
-    setSlots((prev) => prev.filter((s) => s.id !== selectedSlotId));
-    setSelectedSlotId("");
-    setExtraMinutes(0);
-
-    setMessage(
-      data?.appointment?.status === "PENDING_PAYMENT"
-        ? "Appointment created. Payment will be required for extra minutes (Paystack coming next)."
-        : "Appointment confirmed!"
-    );
   }
 
   return (
@@ -284,6 +314,7 @@ export default function BookingClient() {
           </button>
         </div>
       </div>
+
       <ToastContainer />
     </div>
   );

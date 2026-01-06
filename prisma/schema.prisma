@@ -129,6 +129,7 @@ model Appointment {
   baseDurationMinutes Int
   extraMinutes        Int @default(0) // must be multiple of 10 in code
   extraBlocks         Int @default(0) // extraMinutes / 10
+  extraPriceKobo      Int @default(0)
   totalPriceKobo      Int @default(0)
 
   status AppointmentStatus @default(PENDING_PAYMENT)
