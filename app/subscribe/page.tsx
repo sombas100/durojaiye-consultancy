@@ -65,7 +65,7 @@ export default function SubscribePage() {
                   Billed monthly • Cancel anytime
                 </div>
               </div>
-              <div className="text-lg font-bold text-gray-900">₦50,000</div>
+              <div className="text-lg font-bold text-gray-900">₦25,000</div>
             </div>
           </div>
 

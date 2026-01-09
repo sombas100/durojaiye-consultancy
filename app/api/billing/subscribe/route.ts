@@ -86,7 +86,7 @@ export async function POST(_req: NextRequest) {
       plan = await tx.plan.create({
         data: {
           name: "Monthly Subscription",
-          priceKobo: 5_000_000, // ₦50,000
+          priceKobo: 2_500_000, // ₦25,000
           interval: "monthly",
           paystackPlanCode: planCode,
           isActive: true,
@@ -110,7 +110,7 @@ export async function POST(_req: NextRequest) {
         userId: user.id,
         type: "SUBSCRIPTION",
         status: "PENDING",
-        amountKobo: 5_000_000,
+        amountKobo: 2_500_000,
         currency: "NGN",
         subscriptionId: sub.id,
         provider: "PAYSTACK",
@@ -128,7 +128,7 @@ export async function POST(_req: NextRequest) {
 
   const payload = {
     email: user.email,
-    amount: 5_000_000, // Kobo
+    amount: 2_500_000, // Kobo
     currency: "NGN",
     plan: planCode,
     callback_url: callbackUrl,
