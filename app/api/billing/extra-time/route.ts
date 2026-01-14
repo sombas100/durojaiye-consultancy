@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       id: true,
       status: true,
       extraMinutes: true,
-      extraPriceKobo: true,         
+      extraPriceKobo: true,
       patient: { select: { email: true } },
     },
   });
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Appointment not found." }, { status: 404 });
   }
 
-  // ✅ route is for EXTRA ONLY
   if (appt.extraMinutes <= 0 || appt.extraPriceKobo <= 0) {
     return NextResponse.json({ error: "No extra payment required." }, { status: 400 });
   }
@@ -60,41 +59,46 @@ export async function POST(req: NextRequest) {
 
   const existingPending = await prisma.payment.findFirst({
     where: { appointmentId: appt.id, type: "EXTRA_MINUTES", status: "PENDING" },
-    select: { id: true, reference: true },
+    select: { id: true, reference: true, authorizationUrl: true },
   });
 
-  if (existingPending) {
-  // if it already has a ref, they must complete that one
-  if (existingPending.reference) {
-    return NextResponse.json(
-      { error: "You already have a pending extra-minutes payment. Please complete it." },
-      { status: 400 }
-    );
+  // ✅ If they already started, just send them back to Paystack
+  if (existingPending?.authorizationUrl) {
+    return NextResponse.json({
+      authorizationUrl: existingPending.authorizationUrl,
+      reference: existingPending.reference,
+      resumed: true,
+    });
   }
-}
 
+  // ✅ If a pending exists but we don't have the URL (older data),
+  // mark it failed so we can create a new clean transaction.
+  if (existingPending && !existingPending.authorizationUrl) {
+    await prisma.payment.update({
+      where: { id: existingPending.id },
+      data: { status: "FAILED" },
+    });
+  }
 
-  const payment = existingPending
-    ? { id: existingPending.id }
-    : await prisma.payment.create({
-        data: {
-          userId: session.user.id,
-          appointmentId: appt.id,
-          type: "EXTRA_MINUTES",
-          status: "PENDING",
-          amountKobo: appt.extraPriceKobo,   
-          currency: "NGN",
-          provider: "PAYSTACK",
-        },
-        select: { id: true },
-      });
+  // create a fresh payment record
+  const payment = await prisma.payment.create({
+    data: {
+      userId: session.user.id,
+      appointmentId: appt.id,
+      type: "EXTRA_MINUTES",
+      status: "PENDING",
+      amountKobo: appt.extraPriceKobo,
+      currency: "NGN",
+      provider: "PAYSTACK",
+    },
+    select: { id: true },
+  });
 
   const callbackUrl = `${appUrl}/billing/extra/callback?appointmentId=${appt.id}`;
 
-
   const payload = {
     email,
-    amount: appt.extraPriceKobo,         
+    amount: appt.extraPriceKobo,
     currency: "NGN",
     callback_url: callbackUrl,
     metadata: {
@@ -120,7 +124,6 @@ export async function POST(req: NextRequest) {
   if (!psRes.ok) {
     console.error("Paystack initialize failed:", psData);
 
-    // ✅ mark failed so they can retry cleanly
     await prisma.payment.update({
       where: { id: payment.id },
       data: { status: "FAILED" },
@@ -134,7 +137,10 @@ export async function POST(req: NextRequest) {
 
   await prisma.payment.update({
     where: { id: payment.id },
-    data: { reference: psData.data.reference },
+    data: {
+      reference: psData.data.reference,
+      authorizationUrl: psData.data.authorization_url, // ✅ store it
+    },
   });
 
   return NextResponse.json({

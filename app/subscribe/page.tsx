@@ -1,11 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-toastify";
 
 export default function SubscribePage() {
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const reset = () => setLoading(false);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") reset();
+    };
+
+    // Handles returning from Paystack via back/forward cache
+    window.addEventListener("pageshow", reset);
+
+    // Handles tab switching / returning to the page
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pageshow", reset);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   async function handleSubscribe() {
     setLoading(true);
@@ -73,7 +92,7 @@ export default function SubscribePage() {
             <button
               onClick={handleSubscribe}
               disabled={loading}
-              className="flex-1 rounded-xl bg-blue-600 text-white py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl cursor-pointer bg-blue-600 text-white py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? "Redirecting to Paystack…" : "Subscribe now"}
             </button>

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
@@ -9,17 +9,17 @@ function assertAdminOrDoctor(role?: string) {
   return role === "ADMIN" || role === "DOCTOR";
 }
 
-export async function DELETE(req: Request, ctx: { params?: { id?: string } }) {
+export async function DELETE(
+  _req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !assertAdminOrDoctor(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ✅ Prefer params, fallback to URL parsing
-    const url = new URL(req.url);
-    const idFromUrl = url.pathname.split("/").filter(Boolean).pop();
-    const id = ctx?.params?.id || idFromUrl;
+    const { id } = await context.params;
 
     if (!id) {
       return NextResponse.json({ error: "Missing slot id" }, { status: 400 });
@@ -27,9 +27,9 @@ export async function DELETE(req: Request, ctx: { params?: { id?: string } }) {
 
     await prisma.availabilitySlot.delete({ where: { id } });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {
-    // ✅ If the slot was already deleted (double click or stale UI), don’t 500
+    
     if (err?.code === "P2025") {
       return NextResponse.json({ error: "Slot not found" }, { status: 404 });
     }

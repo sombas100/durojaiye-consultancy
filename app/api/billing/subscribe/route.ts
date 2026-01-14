@@ -48,8 +48,6 @@ export async function POST(_req: NextRequest) {
   });
 
   if (existing?.status === "ACTIVE") {
-    // If they've scheduled cancellation, you can decide whether to allow re-subscribe.
-    // I'd block for now (simpler UX), and later you can add a "Reactivate" flow.
     if (existing.cancelAtPeriodEnd) {
       return NextResponse.json(
         {
@@ -66,11 +64,46 @@ export async function POST(_req: NextRequest) {
     );
   }
 
+  /**
+   * ✅ If they already have a pending subscription, RESUME it by returning the saved Paystack URL.
+   * This fixes the "I closed Paystack and can't continue" problem.
+   */
   if (existing?.status === "PENDING") {
-    return NextResponse.json(
-      { error: "You already have a subscription payment pending. Please complete it." },
-      { status: 400 }
-    );
+    const pendingPayment = await prisma.payment.findFirst({
+      where: {
+        subscriptionId: existing.id,
+        type: "SUBSCRIPTION",
+        status: "PENDING",
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, reference: true, authorizationUrl: true },
+    });
+
+    // ✅ If we have the saved checkout URL, send them back to Paystack
+    if (pendingPayment?.authorizationUrl) {
+      return NextResponse.json({
+        authorizationUrl: pendingPayment.authorizationUrl,
+        reference: pendingPayment.reference,
+        resumed: true,
+      });
+    }
+
+    // ✅ If we DON'T have the URL (older rows), clean up so they can try again cleanly.
+    await prisma.$transaction(async (tx) => {
+      await tx.subscription.update({
+        where: { id: existing.id },
+        data: { status: "CANCELLED" },
+      });
+
+      if (pendingPayment) {
+        await tx.payment.update({
+          where: { id: pendingPayment.id },
+          data: { status: "FAILED" },
+        });
+      }
+    });
+
+    // After cleanup, continue and create a new subscription/payment below.
   }
 
   /**
@@ -100,7 +133,7 @@ export async function POST(_req: NextRequest) {
         userId: user.id,
         planId: plan.id,
         status: "PENDING",
-        cancelAtPeriodEnd: false, // optional; default is false anyway
+        cancelAtPeriodEnd: false,
       },
       select: { id: true },
     });
@@ -155,7 +188,7 @@ export async function POST(_req: NextRequest) {
   if (!psRes.ok) {
     console.error("Paystack initialize failed:", psData);
 
-    // Optional cleanup (recommended): mark payment/subscription as FAILED so they can try again cleanly
+    // ✅ cleanup so they can retry cleanly
     await prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: created.paymentId },
@@ -164,7 +197,7 @@ export async function POST(_req: NextRequest) {
 
       await tx.subscription.update({
         where: { id: created.subscriptionId },
-        data: { status: "CANCELLED" }, // or keep PENDING but it's messy; CANCELLED is cleaner
+        data: { status: "CANCELLED" },
       });
     });
 
@@ -174,17 +207,20 @@ export async function POST(_req: NextRequest) {
     );
   }
 
-  // ✅ Only update reference after success
+  // ✅ store reference AND authorizationUrl so we can resume later
   const reference = psData?.data?.reference as string | undefined;
-  if (reference) {
-    await prisma.payment.update({
-      where: { id: created.paymentId },
-      data: { reference },
-    });
-  }
+  const authorizationUrl = psData?.data?.authorization_url as string | undefined;
+
+  await prisma.payment.update({
+    where: { id: created.paymentId },
+    data: {
+      reference,
+      authorizationUrl,
+    },
+  });
 
   return NextResponse.json({
-    authorizationUrl: psData.data.authorization_url,
+    authorizationUrl,
     reference,
   });
 }

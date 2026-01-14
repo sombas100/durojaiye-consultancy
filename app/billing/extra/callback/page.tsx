@@ -1,29 +1,20 @@
-"use client";
+import { Suspense } from "react";
+import CallbackClient from "./CallbackClient";
 
-import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+export const dynamic = "force-dynamic";
 
-export default function ExtraPaymentCallback() {
-  const router = useRouter();
-  const params = useSearchParams();
-
-  useEffect(() => {
-    // Give webhook a moment to run, then redirect
-    const t = setTimeout(() => {
-      router.replace("/my-appointments"); // or wherever you list appointments
-    }, 2500);
-
-    return () => clearTimeout(t);
-  }, [router]);
-
+export default function ExtraBillingCallbackPage() {
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="text-center space-y-3">
-        <h1 className="text-lg font-semibold">Processing payment…</h1>
-        <p className="text-sm text-gray-600">
-          Please wait while we confirm your extra time.
-        </p>
-      </div>
-    </div>
+    <Suspense
+      fallback={
+        <main className="min-h-[70vh] flex items-center justify-center px-4">
+          <div className="w-full max-w-lg rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="text-sm text-gray-600">Processing payment…</div>
+          </div>
+        </main>
+      }
+    >
+      <CallbackClient />
+    </Suspense>
   );
 }

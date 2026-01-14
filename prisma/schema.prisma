@@ -177,8 +177,9 @@ model Payment {
   appointmentId  String?
   subscriptionId String?
 
-  provider  String  @default("PAYSTACK")
-  reference String? @unique // Paystack reference
+  provider         String  @default("PAYSTACK")
+  reference        String? @unique // Paystack reference
+  authorizationUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
