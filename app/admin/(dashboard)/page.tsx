@@ -74,7 +74,12 @@ export default async function AdminOverviewPage() {
     }),
   ]);
 
-  const countMap = new Map(counts.map((c) => [c.status, c._count.status]));
+  const countMap = new Map(
+    counts.map((c: { status: string; _count: { status: number } }) => [
+      c.status,
+      c._count.status,
+    ])
+  );
 
   const pendingPayment = countMap.get("PENDING_PAYMENT") ?? 0;
   const confirmed = countMap.get("CONFIRMED") ?? 0;
