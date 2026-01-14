@@ -19,6 +19,9 @@ function assertAdminOrDoctor(role?: string) {
   return role === "ADMIN" || role === "DOCTOR";
 }
 
+// ✅ Type for transaction client (avoids implicit any + avoids Prisma namespace import issues)
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -68,7 +71,7 @@ export async function PATCH(request: NextRequest) {
     const start = new Date(appt.startTimeUtc);
     const end = new Date(appt.endTimeUtc);
 
-    const txResult = await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx: Tx) => {
       const updated = await tx.appointment.update({
         where: { id },
         data: { status: newStatus },
