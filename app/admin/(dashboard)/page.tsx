@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrDoctor } from "../../../lib/auth-guard";
-import type { Prisma } from "@prisma/client";
 
 const TIMEZONE = "Africa/Lagos";
 
@@ -25,29 +24,31 @@ function addDays(date: Date, days: number) {
   return d;
 }
 
-// ✅ Types for the exact shape you select in findMany
-type AppointmentCard = Prisma.AppointmentGetPayload<{
-  select: {
-    id: true;
-    startTimeUtc: true;
-    endTimeUtc: true;
-    status: true;
-    patient: { select: { name: true; surname: true; email: true } };
+// ✅ Exact shape you select in findMany
+type AppointmentCard = {
+  id: string;
+  startTimeUtc: Date;
+  endTimeUtc: Date;
+  status: string;
+  patient: {
+    name: string | null;
+    surname: string | null;
+    email: string | null;
   };
-}>;
+};
 
-// ✅ Type for the groupBy result you use
-type StatusCount = Prisma.AppointmentGroupByOutputType;
+// ✅ Exact shape of your groupBy result
+type StatusCountRow = {
+  status: string;
+  _count: { status: number } | null;
+};
 
 export default async function AdminOverviewPage() {
   const result = await requireAdminOrDoctor();
   if (!result.ok) return null;
 
-  // "Today" window in Lagos
   const dayStart = startOfDayInLagos();
   const dayEnd = addDays(dayStart, 1);
-
-  // Next 7 days window
   const weekEnd = addDays(dayStart, 7);
 
   const [today, upcoming, counts] = (await Promise.all([
@@ -87,11 +88,10 @@ export default async function AdminOverviewPage() {
       by: ["status"],
       _count: { status: true },
     }),
-  ])) as [AppointmentCard[], AppointmentCard[], StatusCount[]];
+  ])) as [AppointmentCard[], AppointmentCard[], StatusCountRow[]];
 
-  // ✅ Fully typed map: status -> number
   const countMap = new Map<string, number>(
-    counts.map((c) => [String(c.status), c._count?.status ?? 0])
+    counts.map((c) => [c.status, c._count?.status ?? 0])
   );
 
   const pendingPayment = countMap.get("PENDING_PAYMENT") ?? 0;
@@ -108,7 +108,6 @@ export default async function AdminOverviewPage() {
         </p>
       </div>
 
-      {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="text-xs font-semibold text-gray-500">
@@ -118,18 +117,21 @@ export default async function AdminOverviewPage() {
             {pendingPayment}
           </div>
         </div>
+
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="text-xs font-semibold text-gray-500">Confirmed</div>
           <div className="mt-2 text-2xl font-bold text-gray-900">
             {confirmed}
           </div>
         </div>
+
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="text-xs font-semibold text-gray-500">Completed</div>
           <div className="mt-2 text-2xl font-bold text-gray-900">
             {completed}
           </div>
         </div>
+
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="text-xs font-semibold text-gray-500">Cancelled</div>
           <div className="mt-2 text-2xl font-bold text-gray-900">
@@ -139,7 +141,6 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Today */}
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Today</h2>
           <p className="mt-1 text-sm text-gray-600">
@@ -156,6 +157,7 @@ export default async function AdminOverviewPage() {
                 const patientName =
                   `${a.patient.name ?? ""} ${a.patient.surname ?? ""}`.trim() ||
                   "Patient";
+
                 return (
                   <div
                     key={a.id}
@@ -167,6 +169,7 @@ export default async function AdminOverviewPage() {
                       </div>
                       <div className="text-xs text-gray-600">{a.status}</div>
                     </div>
+
                     <div className="mt-1 text-xs text-gray-600">
                       {new Intl.DateTimeFormat("en-GB", {
                         timeZone: TIMEZONE,
@@ -180,6 +183,7 @@ export default async function AdminOverviewPage() {
                         minute: "2-digit",
                       }).format(new Date(a.endTimeUtc))}
                     </div>
+
                     <div className="mt-1 text-xs text-gray-500">
                       {a.patient.email}
                     </div>
@@ -190,7 +194,6 @@ export default async function AdminOverviewPage() {
           </div>
         </div>
 
-        {/* Next 7 days */}
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">
             Upcoming (7 days)
@@ -209,6 +212,7 @@ export default async function AdminOverviewPage() {
                 const patientName =
                   `${a.patient.name ?? ""} ${a.patient.surname ?? ""}`.trim() ||
                   "Patient";
+
                 return (
                   <div
                     key={a.id}
@@ -220,6 +224,7 @@ export default async function AdminOverviewPage() {
                       </div>
                       <div className="text-xs text-gray-600">{a.status}</div>
                     </div>
+
                     <div className="mt-1 text-xs text-gray-600">
                       {new Intl.DateTimeFormat("en-GB", {
                         timeZone: TIMEZONE,
@@ -230,6 +235,7 @@ export default async function AdminOverviewPage() {
                         minute: "2-digit",
                       }).format(new Date(a.startTimeUtc))}
                     </div>
+
                     <div className="mt-1 text-xs text-gray-500">
                       {a.patient.email}
                     </div>
