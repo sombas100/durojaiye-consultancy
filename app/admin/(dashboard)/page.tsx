@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrDoctor } from "../../../lib/auth-guard";
+import type { Prisma } from "@prisma/client";
 
 const TIMEZONE = "Africa/Lagos";
 
@@ -24,6 +25,20 @@ function addDays(date: Date, days: number) {
   return d;
 }
 
+// ✅ Types for the exact shape you select in findMany
+type AppointmentCard = Prisma.AppointmentGetPayload<{
+  select: {
+    id: true;
+    startTimeUtc: true;
+    endTimeUtc: true;
+    status: true;
+    patient: { select: { name: true; surname: true; email: true } };
+  };
+}>;
+
+// ✅ Type for the groupBy result you use
+type StatusCount = Prisma.AppointmentGroupByOutputType;
+
 export default async function AdminOverviewPage() {
   const result = await requireAdminOrDoctor();
   if (!result.ok) return null;
@@ -35,7 +50,7 @@ export default async function AdminOverviewPage() {
   // Next 7 days window
   const weekEnd = addDays(dayStart, 7);
 
-  const [today, upcoming, counts] = await Promise.all([
+  const [today, upcoming, counts] = (await Promise.all([
     prisma.appointment.findMany({
       where: {
         startTimeUtc: { gte: dayStart, lt: dayEnd },
@@ -72,13 +87,11 @@ export default async function AdminOverviewPage() {
       by: ["status"],
       _count: { status: true },
     }),
-  ]);
+  ])) as [AppointmentCard[], AppointmentCard[], StatusCount[]];
 
+  // ✅ Fully typed map: status -> number
   const countMap = new Map<string, number>(
-    counts.map((c: { status: string; _count: { status: number } }) => [
-      c.status,
-      c._count.status,
-    ])
+    counts.map((c) => [String(c.status), c._count?.status ?? 0])
   );
 
   const pendingPayment = countMap.get("PENDING_PAYMENT") ?? 0;
