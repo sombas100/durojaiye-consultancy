@@ -14,6 +14,9 @@ const schema = z.object({
   extraMinutes: z.number().int().min(0),
 });
 
+// ✅ Type for transaction client (avoids implicit any)
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -119,7 +122,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Reserve atomically: create appointment + delete slot so others can’t book it
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Tx) => {
       // Re-check slot exists inside transaction
       const slotInsideTx = await tx.availabilitySlot.findUnique({
         where: { id: slotId },
