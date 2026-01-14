@@ -1,19 +1,19 @@
-import { PrismaClient } from "@prisma/client/edge";
+import * as Prisma from "@prisma/client";
+const PrismaClient = Prisma.PrismaClient;
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
 const connectionString = process.env.DATABASE_URL;
-
 if (!connectionString) {
   throw new Error("Missing env: DATABASE_URL");
 }
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient;
+  prisma?: InstanceType<typeof PrismaClient>;
   pool?: Pool;
 };
 
-// Reuse Pool in dev to avoid creating too many connections
+// Reuse Pool in dev to avoid opening too many connections
 const pool =
   globalForPrisma.pool ??
   new Pool({
