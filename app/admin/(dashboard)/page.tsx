@@ -74,7 +74,7 @@ export default async function AdminOverviewPage() {
     }),
   ]);
 
-  const countMap = new Map(
+  const countMap = new Map<string, number>(
     counts.map((c: { status: string; _count: { status: number } }) => [
       c.status,
       c._count.status,
