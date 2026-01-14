@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { Tx } from "@/lib/prisma-types";
 
 export const runtime = "nodejs";
 
@@ -181,7 +182,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx:Tx) => {
         // ✅ Validate the payment row matches this appointment + type
         const pay = await tx.payment.findUnique({
           where: { id: paymentId },
@@ -296,7 +297,7 @@ export async function POST(req: NextRequest) {
   try {
     const now = new Date();
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx:Tx) => {
       // 1) Mark payment success + store reference
       if (paymentId) {
         // NOTE: this update() will throw if already SUCCESS; keep your pattern or switch to updateMany.
