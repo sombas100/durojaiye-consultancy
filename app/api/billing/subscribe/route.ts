@@ -110,7 +110,7 @@ export async function POST(_req: NextRequest) {
   /**
    * ✅ Create DB records first (PENDING) so webhook can link reliably.
    */
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx: Tx) => {
     let plan = await tx.plan.findFirst({
       where: { paystackPlanCode: planCode },
       select: { id: true, paystackPlanCode: true },
@@ -190,7 +190,7 @@ export async function POST(_req: NextRequest) {
     console.error("Paystack initialize failed:", psData);
 
     // ✅ cleanup so they can retry cleanly
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Tx) => {
       await tx.payment.update({
         where: { id: created.paymentId },
         data: { status: "FAILED" },
