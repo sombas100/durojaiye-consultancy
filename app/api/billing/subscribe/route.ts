@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { Tx } from "@/lib/prisma-types";
 
 export const runtime = "nodejs";
 
@@ -89,7 +90,7 @@ export async function POST(_req: NextRequest) {
     }
 
     // ✅ If we DON'T have the URL (older rows), clean up so they can try again cleanly.
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Tx) => {
       await tx.subscription.update({
         where: { id: existing.id },
         data: { status: "CANCELLED" },
