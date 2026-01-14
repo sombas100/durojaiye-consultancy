@@ -5,17 +5,17 @@ const Footer = () => {
   const year = new Date().getFullYear();
 
   const productLinks = [
-    { name: "Features", href: "/features" },
+    { name: "Services", href: "/services" },
     { name: "Pricing", href: "/pricing" },
     { name: "Login", href: "/login" },
-    { name: "Get Started", href: "/get-started" },
+    { name: "Get Started", href: "/subscribe" },
   ];
 
   const resourceLinks = [
     { name: "FAQ", href: "/faq" },
     { name: "Support", href: "/support" },
     { name: "Privacy Policy", href: "/privacy-policy" },
-    { name: "Terms of Service", href: "/terms" },
+    { name: "Terms of Service", href: "/terms-of-service" },
   ];
 
   return (

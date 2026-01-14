@@ -3,6 +3,11 @@ import Hero from "@/components/ui/Hero";
 import Link from "next/link";
 import Footer from "./Footer";
 
+export const metadata = {
+  title: "Durojaiye Consultancy | Nigeria based medical consultations",
+  description: "Medical consultation bookings based in Nigeria",
+};
+
 export default function Home() {
   return (
     <>
@@ -134,6 +139,85 @@ export default function Home() {
                   View services
                 </Link>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* What to expect */}
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
+          <div className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  What to expect from your consultation
+                </h3>
+                <p className="mt-2 text-sm text-gray-600 max-w-2xl">
+                  A calm, professional experience designed to help you get
+                  clarity and next steps — whether it’s a new concern or
+                  something ongoing.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                {
+                  title: "Before you book",
+                  desc: "Make sure you have an active subscription to access available slots.",
+                },
+                {
+                  title: "During the consultation",
+                  desc: "Explain what’s going on, ask questions, and get guidance in a focused session.",
+                },
+                {
+                  title: "After the consultation",
+                  desc: "You’ll leave with clear next steps and a plan you can follow with confidence.",
+                },
+                {
+                  title: "Your privacy matters",
+                  desc: "Your information stays private, and your booking is managed securely.",
+                },
+                {
+                  title: "Clear pricing",
+                  desc: "Your base consultation time is included. Extra minutes are billed in 10-minute blocks.",
+                },
+                {
+                  title: "Timezone clarity",
+                  desc: "Appointments are shown in Africa/Lagos (WAT) so scheduling is simple and consistent.",
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border bg-gray-50 p-5 hover:bg-gray-100 transition"
+                >
+                  <div className="text-sm font-semibold text-gray-900">
+                    {item.title}
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-xl border bg-blue-50 p-4">
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">Tip:</span> If you have any
+                documents or notes, keep them nearby so you can reference them
+                quickly during your session.
+              </p>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/subscribe"
+                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
+              >
+                Subscribe
+              </Link>
+              <Link
+                href="/booking"
+                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition"
+              >
+                View booking slots
+              </Link>
             </div>
           </div>
         </section>

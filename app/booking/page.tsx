@@ -5,6 +5,12 @@ import BookingClient from "./BookingClient";
 import { hasActiveSubscription } from "@/lib/subscription";
 import AppointmentBanner from "./AppointmentBanner";
 
+export const metadata = {
+  title: "Booking | Durojaiye Consultancy",
+  description:
+    "Concerned about any underlying conditions? Subscribe and book a consultation today.",
+};
+
 export default async function BookingPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");

@@ -1,4 +1,3 @@
-// app/about/page.tsx
 import Link from "next/link";
 import Navbar from "../Navbar";
 import Footer from "../Footer";
@@ -22,7 +21,7 @@ export default function AboutPage() {
                 Nigeria-based consultations • Online booking
               </p>
 
-              <h1 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900">
+              <h1 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight text-gray-800">
                 Patient-first consultations, delivered with clarity and care.
               </h1>
 
@@ -62,8 +61,9 @@ export default function AboutPage() {
               </h2>
               <p className="mt-3 text-sm text-gray-600 leading-relaxed">
                 To provide reliable, patient-centered consultations that help
-                people make informed decisions about their health—through clear
-                explanations, respectful listening, and practical next steps.
+                people make informed decisions about their health through clear
+                explanations, careful listening, and guidance for practical next
+                steps.
               </p>
             </div>
 
@@ -195,7 +195,7 @@ export default function AboutPage() {
               </h2>
               <p className="mt-3 text-sm text-gray-600 leading-relaxed">
                 The service is designed primarily for patients in Nigeria, but
-                you can access and manage bookings from anywhere—useful for
+                you can access and manage bookings from anywhere useful for
                 travel, relocation, or supporting family members remotely.
               </p>
             </div>
