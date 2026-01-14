@@ -11,6 +11,9 @@ const schema = z.object({
   extraMinutes: z.number().int().min(0),
 });
 
+// ✅ Type for transaction client (avoids implicit any)
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -80,7 +83,8 @@ export async function POST(req: NextRequest) {
     // Base is free with subscription (your choice), so basePriceKobo likely 0.
     // Total here is only extras.
     const totalPriceKobo =
-      (doctorProfile.basePriceKobo ?? 0) + extraBlocks * doctorProfile.extra10MinPriceKobo;
+      (doctorProfile.basePriceKobo ?? 0) +
+      extraBlocks * doctorProfile.extra10MinPriceKobo;
 
     const start = new Date(slot.startTimeUtc);
     const end = new Date(start.getTime() + (baseDurationMinutes + extraMinutes) * 60_000);
@@ -112,7 +116,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Reserve atomically: create appointment + delete slot so others can’t book it
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Tx) => {
       // Re-check slot exists inside transaction
       const slotInsideTx = await tx.availabilitySlot.findUnique({
         where: { id: slotId },
