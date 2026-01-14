@@ -5,6 +5,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { sendDoctorCancelledByPatientEmail } from "@/lib/email/send";
 import { sendPatientCancelledBySelfEmail } from "@/lib/email/send";
+import { Tx } from "@/lib/prisma-types";
 
 
 
@@ -64,7 +65,7 @@ export async function PATCH(req: Request) {
     const start = new Date(appt.startTimeUtc);
     const end = new Date(appt.endTimeUtc);
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx:Tx) => {
       // 1) Cancel the appointment
       const updated = await tx.appointment.update({
         where: { id: appt.id },
