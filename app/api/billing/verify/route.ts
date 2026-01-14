@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Tx } from "@/lib/prisma-types";
 
 export const runtime = "nodejs";
 
@@ -175,7 +176,7 @@ export async function GET(req: NextRequest) {
 
     const now = new Date();
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx:Tx) => {
       await tx.payment.update({
         where: { id: paymentRow.id },
         data: { status: "SUCCESS" },
