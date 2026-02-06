@@ -2,23 +2,37 @@
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
 
-    await signIn("credentials", {
+    setLoading(true);
+    setError(null);
+
+    const res = await signIn("credentials", {
       email,
       password,
-      callbackUrl: "/admin",
+      redirect: false, // ✅ important
     });
 
     setLoading(false);
+
+    if (res?.error) {
+      setError("Invalid admin credentials.");
+      return;
+    }
+
+    router.push("/admin");
   }
 
   return (
@@ -32,6 +46,13 @@ export default function AdminLoginPage() {
             For doctor and staff access only
           </p>
         </div>
+
+        {/* ✅ Error message */}
+        {error ? (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
 
         <form onSubmit={onSubmit} className="space-y-5">
           <div>
