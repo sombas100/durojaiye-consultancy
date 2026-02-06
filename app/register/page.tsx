@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -11,15 +11,29 @@ export default function RegisterPage() {
   const [surname, setSurname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState(""); // ✅ added
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const passwordsMatch = useMemo(() => {
+    // don’t show mismatch until user has typed something in confirm
+    if (!confirmPassword) return true;
+    return password === confirmPassword;
+  }, [password, confirmPassword]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    // ✅ frontend-only confirm password check
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -127,6 +141,7 @@ export default function RegisterPage() {
             />
           </div>
 
+          {/* Password */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password
@@ -144,9 +159,33 @@ export default function RegisterPage() {
             </p>
           </div>
 
+          {/* ✅ Confirm Password */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Confirm password
+            </label>
+            <input
+              type="password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+              className={[
+                "w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500",
+                passwordsMatch ? "border-gray-300" : "border-red-300",
+              ].join(" ")}
+            />
+
+            {!passwordsMatch ? (
+              <p className="mt-2 text-xs text-red-600">
+                Passwords do not match.
+              </p>
+            ) : null}
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !passwordsMatch}
             className="w-full rounded-xl bg-emerald-600 text-white py-2.5 font-medium cursor-pointer hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Creating account..." : "Create account"}
